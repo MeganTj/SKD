@@ -367,7 +367,8 @@ def train(epoch, train_loader, model_s, model_t , criterion_cls, criterion_div, 
             
             
 #             sampled_inputs = inputs_aug[torch.randperm(3*batch_size)[:batch_size]]
-            inputs_all = torch.cat((x, x_180, x_90, x_270),0)
+#             inputs_all = torch.cat((x, x_180, x_90, x_270),0)
+            inputs_all = torch.cat((x, x_90),0)
 
             # ===================forward=====================
 
