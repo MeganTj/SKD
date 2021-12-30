@@ -4,6 +4,7 @@ import os
 import pickle
 from PIL import Image
 import numpy as np
+import pdb
 
 import torch
 import torchvision.transforms as transforms
@@ -245,7 +246,6 @@ class MetaCIFAR100(CIFAR100):
             ])
         else:
             self.test_transform = test_transform
-
         self.data = {}
         for idx in range(self.imgs.shape[0]):
             if self.labels[idx] not in self.data:
@@ -313,8 +313,8 @@ if __name__ == '__main__':
     args.n_ways = 5
     args.n_shots = 1
     args.n_queries = 12
-    # args.data_root = 'data'
-    args.data_root = '/home/yonglong/Downloads/FC100'
+    args.data_root = 'Datasets/CIFAR_FS/CIFAR-FS'
+    args.simclr = False
     args.data_aug = True
     args.n_test_runs = 5
     args.n_aug_support_samples = 1

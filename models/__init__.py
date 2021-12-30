@@ -1,6 +1,6 @@
 from .convnet import convnet4
 from .resnet import resnet12
-from .resnet_ssl import resnet12_ssl
+from .resnet_ssl import resnet12_ssl, resnet18, resnet24, resnet50
 from .resnet_sd import resnet12_sd
 from .resnet_selfdist import multi_resnet12_kd
 from .resnet import seresnet12
@@ -14,6 +14,9 @@ model_pool = [
     'resnet12_ssl',
     'resnet12_kd',
     'resnet12_sd',
+    'resnet18',
+    'resnet24',
+    'resnet50',
     'seresnet12',
     'wrn_28_10',
 ]
@@ -23,6 +26,9 @@ model_dict = {
     'convnet4': convnet4,
     'resnet12': resnet12,
     'resnet12_ssl': resnet12_ssl,
+    'resnet18': resnet18,
+    'resnet24': resnet24,
+    'resnet50': resnet50,
     'resnet12_kd': multi_resnet12_kd,
     'resnet12_sd': resnet12_sd,
     'seresnet12': seresnet12,

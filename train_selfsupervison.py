@@ -25,13 +25,12 @@ from dataset.tiered_imagenet import TieredImageNet, MetaTieredImageNet
 from dataset.cifar import CIFAR100, MetaCIFAR100
 from dataset.transform_cfg import transforms_options, transforms_test_options, transforms_list
 
-from util import adjust_learning_rate, accuracy, AverageMeter
+from util import Logger, adjust_learning_rate, accuracy, AverageMeter
 from eval.meta_eval import meta_test, meta_test_tune
 from eval.cls_eval import validate
 
 from models.resnet import resnet12
 import numpy as np
-from util import Logger
 import wandb
 from dataloader import get_dataloaders
 

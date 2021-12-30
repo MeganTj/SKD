@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 from torch.distributions import Bernoulli
+import pdb
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -149,18 +150,19 @@ class BasicBlock(nn.Module):
 class ResNet(nn.Module):
 
     def __init__(self, block, n_blocks, keep_prob=1.0, avg_pool=False, drop_rate=0.0,
-                 dropblock_size=5, num_classes=-1, use_se=False):
+                 dropblock_size=5, num_classes=-1, inplanes=3, is_small=False, use_se=False):
         super(ResNet, self).__init__()
-
-        self.inplanes = 3
+        self.is_small = is_small # If true, omit layer4
+        self.inplanes = inplanes
         self.use_se = use_se
-        self.layer1 = self._make_layer(block, n_blocks[0], 64,
+        self.lst_channels = [64, 160, 320, 640]
+        self.layer1 = self._make_layer(block, n_blocks[0], self.lst_channels[0],
                                        stride=2, drop_rate=drop_rate)
-        self.layer2 = self._make_layer(block, n_blocks[1], 160,
+        self.layer2 = self._make_layer(block, n_blocks[1], self.lst_channels[1],
                                        stride=2, drop_rate=drop_rate)
-        self.layer3 = self._make_layer(block, n_blocks[2], 320,
+        self.layer3 = self._make_layer(block, n_blocks[2], self.lst_channels[2],
                                        stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size)
-        self.layer4 = self._make_layer(block, n_blocks[3], 640,
+        self.layer4 = self._make_layer(block, n_blocks[3], self.lst_channels[3],
                                        stride=2, drop_rate=drop_rate, drop_block=True, block_size=dropblock_size)
         if avg_pool:
             # self.avgpool = nn.AvgPool2d(5, stride=1)
@@ -179,7 +181,8 @@ class ResNet(nn.Module):
 
         self.num_classes = num_classes
         if self.num_classes > 0:
-            self.classifier = nn.Linear(640, self.num_classes)
+            self.classifier = nn.Linear(640 if not self.is_small else 320, self.num_classes)
+            self.pred_mask1, self.pred_mask2 = self._get_deconv_block(self.lst_channels[:-1][::-1] if self.is_small else self.lst_channels[::-1]) 
             self.rot_classifier = nn.Linear(self.num_classes, 4)
 #             self.rot_classifier1 = nn.Linear(self.num_classes, 32)
 #             self.rot_classifier2 = nn.Linear(32, 16)
@@ -211,20 +214,48 @@ class ResNet(nn.Module):
             layers.append(layer)
 
         return nn.Sequential(*layers)
+    
+    def _get_deconv_block(self, lst_channels):
+        def _get_deconv_layers(in_channels, out_channels, kernel_size):
+            layers = [
+                torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size),
+                torch.nn.ConvTranspose2d(out_channels, out_channels, 3, padding=1),
+#                 torch.nn.ConvTranspose2d(out_channels, out_channels, 3, padding=1),
+                     ]
+            return layers
+            
+        layers1 = []
+        layers2 = []
+        lst_channels.append(1)
+        kernel_size = 3
+        for idx, (in_channels, out_channels) in enumerate(zip(lst_channels, lst_channels[1:])):
+            # Do the reverse of the ResNet
+            layers1.extend(_get_deconv_layers(in_channels, out_channels, kernel_size))
+            layers2.extend(_get_deconv_layers(in_channels, out_channels, kernel_size))
+            kernel_size += (idx + 1) * 2
+        return nn.Sequential(*layers1), nn.Sequential(*layers2)
+    
 
-    def forward(self, x, is_feat=False, rot=False):
+    def forward(self, x, is_feat=False, rot=False, ret_mask=False):
         x = self.layer1(x)
         f0 = x
         x = self.layer2(x)
         f1 = x
         x = self.layer3(x)
         f2 = x
-        x = self.layer4(x)
-        f3 = x
+        if not self.is_small:
+            x = self.layer4(x)
+            f3 = x
+        # Predict masks
+        tup_mask = None
+        if ret_mask:
+            tup_mask = (self.pred_mask1(x), self.pred_mask2(x))
+
         if self.keep_avg_pool:
             x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         feat = x
+        lst_feat = [f0, f1, f2, feat] if self.is_small else [f0, f1, f2, f3, feat]
         
         xx = self.classifier(x)
         
@@ -232,12 +263,12 @@ class ResNet(nn.Module):
 #             xy1 = self.rot_classifier1(xx)
 #             xy2 = self.rot_classifier2(xy1)
             xy = self.rot_classifier(xx)
-            return [f0, f1, f2, f3, feat], (xx, xy)
+            return lst_feat, (xx, xy), tup_mask
         
         if is_feat:
-            return [f0, f1, f2, f3, feat], xx
+            return lst_feat, xx, tup_mask
         else:
-            return xx
+            return xx, tup_mask
 
 
 def resnet12_ssl(keep_prob=1.0, avg_pool=False, **kwargs):

@@ -17,10 +17,7 @@ import torch.nn as nn
 import sys, os
 from collections import Counter
 
-
-sys.path.append(os.path.abspath('..'))
-
-from util import accuracy
+from .util import accuracy
 
 
 def mean_confidence_interval(data, confidence=0.95):
