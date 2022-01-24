@@ -44,7 +44,7 @@ class DropBlock(nn.Module):
             batch_size, channels, height, width = x.shape
             
             bernoulli = Bernoulli(gamma)
-            mask = bernoulli.sample((batch_size, channels, height - (self.block_size - 1), width - (self.block_size - 1))).cuda()
+            mask = bernoulli.sample((batch_size, channels, height - (self.block_size - 1), width - (self.block_size - 1))).to(x.device)
             block_mask = self._compute_block_mask(mask)
             countM = block_mask.size()[0] * block_mask.size()[1] * block_mask.size()[2] * block_mask.size()[3]
             count_ones = block_mask.sum()
@@ -67,8 +67,8 @@ class DropBlock(nn.Module):
                 torch.arange(self.block_size).view(-1, 1).expand(self.block_size, self.block_size).reshape(-1), # - left_padding,
                 torch.arange(self.block_size).repeat(self.block_size), #- left_padding
             ]
-        ).t().cuda()
-        offsets = torch.cat((torch.zeros(self.block_size**2, 2).cuda().long(), offsets.long()), 1)
+        ).t().to(mask.device)
+        offsets = torch.cat((torch.zeros(self.block_size**2, 2).to(mask.device).long(), offsets.long()), 1)
         
         if nr_blocks > 0:
             non_zero_idxs = non_zero_idxs.repeat(self.block_size ** 2, 1)
@@ -216,8 +216,33 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
     
+#     def _get_deconv_block(self, lst_channels):
+#         def _get_deconv_layers(in_channels, out_channels):
+#             layers = []
+#             for _ in range(self.n_deconv_conv):
+#                 layers.extend([
+#                     conv3x3(in_channels, in_channels),
+#                     nn.BatchNorm2d(in_channels),
+#                     nn.LeakyReLU(0.1),
+#                 ])
+#             layers.extend([
+#                 torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2),
+#                 nn.LeakyReLU(0.1)
+#             ])
+#             return layers
+            
+#         layers1 = []
+#         layers2 = []
+#         lst_channels.append(1)
+#         for idx, (in_channels, out_channels) in enumerate(zip(lst_channels, lst_channels[1:])):
+#             # Do the reverse of the ResNet
+#             layers1.extend(_get_deconv_layers(in_channels, out_channels))
+#             layers2.extend(_get_deconv_layers(in_channels, out_channels))
+#         return nn.Sequential(*layers1), nn.Sequential(*layers2)
+    
+    
     def _get_deconv_block(self, lst_channels):
-        def _get_deconv_layers(in_channels, out_channels):
+        def _get_deconv_layers(in_channels, out_channels, output_padding):
             layers = []
             for _ in range(self.n_deconv_conv):
                 layers.extend([
@@ -226,19 +251,37 @@ class ResNet(nn.Module):
                     nn.LeakyReLU(0.1),
                 ])
             layers.extend([
-                torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2),
+                torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2, output_padding=output_padding),
                 nn.LeakyReLU(0.1)
             ])
             return layers
-            
+        
         layers1 = []
         layers2 = []
         lst_channels.append(1)
-        for idx, (in_channels, out_channels) in enumerate(zip(lst_channels, lst_channels[1:])):
+        output_paddings = [1, 0, 0, 1]
+        for idx, (in_channels, out_channels, output_padding) in enumerate(zip(lst_channels, lst_channels[1:], output_paddings)):
             # Do the reverse of the ResNet
-            layers1.extend(_get_deconv_layers(in_channels, out_channels))
-            layers2.extend(_get_deconv_layers(in_channels, out_channels))
+            layers1.extend(_get_deconv_layers(in_channels, out_channels, output_padding=output_padding))
+            layers2.extend(_get_deconv_layers(in_channels, out_channels, output_padding=output_padding))
         return nn.Sequential(*layers1), nn.Sequential(*layers2)
+
+
+    def encode(self, x, is_feat=False, rot=False, ret_mask=False):
+        x = self.layer1(x)
+        f0 = x
+        x = self.layer2(x)
+        f1 = x
+        x = self.layer3(x)
+        f2 = x
+        if not self.is_small:
+            x = self.layer4(x)
+            f3 = x
+        
+        if self.keep_avg_pool:
+            x = self.avgpool(x)  # x: [B, 320, 1, 1]
+        feat = x.view(x.size(0), -1)
+        return feat
     
 
     def forward(self, x, is_feat=False, rot=False, ret_mask=False):
@@ -250,15 +293,15 @@ class ResNet(nn.Module):
         f2 = x
         if not self.is_small:
             x = self.layer4(x)
-            f3 = x
+            f3 = x  # x: [B, 320, 2, 2]
         # Predict masks
         tup_mask = None
         if ret_mask:
             tup_mask = (self.pred_mask1(x), self.pred_mask2(x))
 
         if self.keep_avg_pool:
-            x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
+            x = self.avgpool(x)  # x: [B, 320, 1, 1]
+        x = x.view(x.size(0), -1)  # [B, 320]
         feat = x
         lst_feat = [f0, f1, f2, feat] if self.is_small else [f0, f1, f2, f3, feat]
         

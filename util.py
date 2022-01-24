@@ -5,7 +5,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import sys
-from dataloader import get_dataloaders
+import sys, os
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..', '..'))
+from reasoning.fsl_baselines.SKD.dataloader import get_dataloaders
 
 
 class LabelSmoothing(nn.Module):

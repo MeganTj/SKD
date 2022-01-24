@@ -14,12 +14,15 @@ import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
-from dataset.mini_imagenet import ImageNet, MetaImageNet
-from dataset.tiered_imagenet import TieredImageNet, MetaTieredImageNet
-from dataset.cifar import CIFAR100, MetaCIFAR100, CIFAR100_toy
-from dataset.transform_cfg import transforms_options, transforms_test_options, transforms_list
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname("__file__"), '..', '..', '..'))
+from reasoning.fsl_baselines.SKD.dataset.mini_imagenet import ImageNet, MetaImageNet
+from reasoning.fsl_baselines.SKD.dataset.tiered_imagenet import TieredImageNet, MetaTieredImageNet
+from reasoning.fsl_baselines.SKD.dataset.cifar import CIFAR100, MetaCIFAR100, CIFAR100_toy
+from reasoning.fsl_baselines.SKD.dataset.transform_cfg import transforms_options, transforms_test_options, transforms_list
 
-from dataset.dataset_selfsupervision import SSDatasetWrapper
+from reasoning.fsl_baselines.SKD.dataset.dataset_selfsupervision import SSDatasetWrapper
 
 import numpy as np
 
